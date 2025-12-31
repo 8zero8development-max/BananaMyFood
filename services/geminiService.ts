@@ -6,13 +6,14 @@ const getAiClient = () => {
 };
 
 /**
- * Analyzes brand inputs (Text, URL, Logo) to produce structured Brand DNA.
+ * Analyzes brand inputs (Text, URL, Logo, Source Image) to produce structured Brand DNA.
  * Uses gemini-2.5-flash for speed and free-tier compatibility.
  */
 export const researchBrandDna = async (
   description: string, 
   websiteUrl: string, 
-  logoBase64: string | null
+  logoBase64: string | null,
+  sourceImageBase64: string | null
 ): Promise<BrandDna> => {
   const ai = getAiClient();
   
@@ -22,10 +23,11 @@ export const researchBrandDna = async (
   - Description: "${description}"
   - Website: "${websiteUrl}"
   ${logoBase64 ? "- A logo image is attached." : ""}
+  ${sourceImageBase64 ? "- A sample product/food photo is attached." : ""}
 
   Task:
   1. Infer the Brand Name if not explicitly stated.
-  2. Analyze the visual style (colors, fonts, vibe) from the logo (if provided) and description.
+  2. Analyze the visual style (colors, fonts, lighting, plating, vibe) from the logo and the sample product photo (if provided). The product photo is a key indicator of the brand's aesthetic.
   3. Determine the Tone of Voice.
   4. Extract key themes/keywords.
   `;
@@ -34,6 +36,16 @@ export const researchBrandDna = async (
   
   if (logoBase64) {
     const base64Data = logoBase64.split(',')[1] || logoBase64;
+    parts.push({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: base64Data
+      }
+    });
+  }
+
+  if (sourceImageBase64) {
+    const base64Data = sourceImageBase64.split(',')[1] || sourceImageBase64;
     parts.push({
       inlineData: {
         mimeType: 'image/jpeg',
@@ -53,7 +65,7 @@ export const researchBrandDna = async (
           name: { type: Type.STRING },
           description: { type: Type.STRING },
           tone: { type: Type.STRING },
-          visualStyle: { type: Type.STRING, description: "Description of colors, shapes, and visual identity inferred from logo/desc" },
+          visualStyle: { type: Type.STRING, description: "Description of colors, shapes, and visual identity inferred from logo/desc/photo" },
           keywords: { type: Type.ARRAY, items: { type: Type.STRING } }
         },
         required: ["name", "description", "tone", "keywords", "visualStyle"]

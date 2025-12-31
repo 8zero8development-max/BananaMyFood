@@ -4,7 +4,7 @@ import { BrandDnaSection } from './components/BrandDnaSection';
 import { ImageCapture } from './components/ImageCapture';
 import { researchBrandDna, generateCreativeConcepts, generateHeroImage, generateFacebookPost } from './services/geminiService';
 import { AppState, BrandDna, ImageSize, CreativeConcept } from './types';
-import { Banana, Pizza, Send, ImageIcon, Share2, Wand2, RefreshCcw, Copy, Sparkles, ArrowRight, ArrowLeft, CheckCircle, Download, Terminal } from 'lucide-react';
+import { Send, ImageIcon, Share2, Wand2, RefreshCcw, Copy, Sparkles, ArrowRight, ArrowLeft, CheckCircle, Download, Terminal } from 'lucide-react';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
@@ -52,7 +52,8 @@ const App: React.FC = () => {
 
     try {
       // 1. Analyze Brand DNA (uses 2.5 Flash - Free/Fast)
-      const dna = await researchBrandDna(state.brandInput, state.brandUrl, state.brandLogo);
+      // Now including sourceImage in the analysis to pick up visual cues from the product itself
+      const dna = await researchBrandDna(state.brandInput, state.brandUrl, state.brandLogo, state.sourceImage);
       
       // 2. Generate Concepts based on DNA + Image (uses 2.5 Flash - Free/Fast)
       const concepts = await generateCreativeConcepts(dna, state.sourceImage);
@@ -192,9 +193,17 @@ Requirements:
         <header className="sticky top-0 z-50 bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800 p-4">
           <div className="max-w-4xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="bg-yellow-500 p-2 rounded-lg relative w-10 h-10 flex items-center justify-center shadow-lg shadow-yellow-500/20">
-                <Banana className="w-7 h-7 text-black absolute bottom-0.5 left-0.5" fill="currentColor" />
-                <Pizza className="w-4 h-4 text-red-600 absolute top-0.5 right-0.5 rotate-12" fill="#dc2626" />
+              <div className="w-14 h-14 bg-yellow-500/10 rounded-full flex items-center justify-center border border-yellow-500/20 overflow-hidden">
+                <img 
+                  src="/banana-logo.png" 
+                  alt="Banana Logo" 
+                  className="w-full h-full object-cover" 
+                  onError={(e) => {
+                    // Fallback to text if image is missing
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    (e.target as HTMLImageElement).parentElement!.innerText = '🍌';
+                  }}
+                />
               </div>
               <h1 className="text-xl font-bold text-white tracking-tight hidden sm:block">
                 <span className="text-yellow-500">Banana</span> my food socials

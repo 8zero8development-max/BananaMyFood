@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { BrandDna } from '../types';
-import { Banana, Pizza, Upload, Link as LinkIcon, X, Image as ImageIcon } from 'lucide-react';
+import { Upload, Link as LinkIcon, X, Image as ImageIcon } from 'lucide-react';
 
 interface Props {
   inputValue: string;
@@ -37,9 +37,16 @@ export const BrandDnaSection: React.FC<Props> = ({
   return (
     <div className="space-y-4 bg-zinc-900 p-6 rounded-2xl border border-zinc-800 h-full flex flex-col">
       <div className="flex items-center gap-2 mb-2">
-        <div className="relative">
-          <Banana className="w-6 h-6 text-yellow-500" />
-          <Pizza className="w-3 h-3 text-red-500 absolute -top-1 -right-1 rotate-12" fill="currentColor" />
+        <div className="relative w-8 h-8 rounded-full overflow-hidden border border-yellow-500/20">
+          <img 
+             src="/banana-logo.png" 
+             alt="Banana Logo" 
+             className="w-full h-full object-cover"
+             onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+                (e.target as HTMLImageElement).parentElement!.innerText = '🍌';
+             }}
+          />
         </div>
         <h2 className="text-xl font-bold text-white">Brand DNA</h2>
       </div>
