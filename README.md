@@ -71,6 +71,18 @@ The application requires a Google Gemini API Key. You have two options:
     *   Use the **Edit** box to tweak the image (e.g., "Make the lighting moodier").
     *   Click **"Download Poster"** to save your asset.
 
+## 📸 Workflow
+
+| Step 1: Input Brand & Food | Step 2: AI Analysis | Step 3: Choose Direction |
+|:---:|:---:|:---:|
+| <img src="assets/screenshots/1-input-form.png" width="300" /> | <img src="assets/screenshots/2-analyzing.png" width="300" /> | <img src="assets/screenshots/3-selection.png" width="300" /> |
+| **Auto-fill brief & upload photo** | **Analyzing DNA & Ideating** | **Select a creative concept** |
+
+| Step 4: Generation | Step 5: Final Result |
+|:---:|:---:|
+| <img src="assets/screenshots/4-generating.png" width="300" /> | <img src="assets/screenshots/5-final-output.png" width="300" /> |
+| **Designing Poster & Typography** | **High-res Social Media Hero** |
+
 ## 🛠️ Tech Stack
 
 - **Frontend**: React 19, TypeScript
