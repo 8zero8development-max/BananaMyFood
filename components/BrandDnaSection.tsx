@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { BrandDna } from '../types';
-import { Upload, Link as LinkIcon, X, Image as ImageIcon } from 'lucide-react';
+import { Upload, Link as LinkIcon, X, Sparkles, Wand2 } from 'lucide-react';
 
 interface Props {
   inputValue: string;
@@ -9,6 +9,18 @@ interface Props {
   onUrlChange: (val: string) => void;
   logoValue: string | null;
   onLogoChange: (val: string | null) => void;
+  
+  // New Inputs
+  targetAudience: string;
+  onTargetAudienceChange: (val: string) => void;
+  customTone: string;
+  onCustomToneChange: (val: string) => void;
+  creativeDirection: string;
+  onCreativeDirectionChange: (val: string) => void;
+  
+  onAutoFill: () => void;
+  isAutoFilling: boolean;
+  
   brandDna: BrandDna | null;
 }
 
@@ -19,6 +31,14 @@ export const BrandDnaSection: React.FC<Props> = ({
   onUrlChange,
   logoValue,
   onLogoChange,
+  targetAudience,
+  onTargetAudienceChange,
+  customTone,
+  onCustomToneChange,
+  creativeDirection,
+  onCreativeDirectionChange,
+  onAutoFill,
+  isAutoFilling,
   brandDna
 }) => {
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -48,16 +68,16 @@ export const BrandDnaSection: React.FC<Props> = ({
              }}
           />
         </div>
-        <h2 className="text-xl font-bold text-white">Brand DNA</h2>
+        <h2 className="text-xl font-bold text-white">Brand Brief</h2>
       </div>
       
       {!brandDna ? (
         <div className="space-y-4 flex-1">
           {/* Text Description */}
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Description</label>
+            <label className="block text-sm text-zinc-400 mb-1">Brand Description</label>
             <textarea
-              className="w-full h-24 bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-all resize-none"
+              className="w-full h-20 bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-all resize-none text-sm"
               placeholder="E.g., A gritty late-night burger joint for skaters..."
               value={inputValue}
               onChange={(e) => onInputChange(e.target.value)}
@@ -71,12 +91,64 @@ export const BrandDnaSection: React.FC<Props> = ({
               <LinkIcon className="absolute left-3 top-3 w-4 h-4 text-zinc-500" />
               <input 
                 type="url"
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 pl-9 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 pl-9 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
                 placeholder="https://..."
                 value={urlValue}
                 onChange={(e) => onUrlChange(e.target.value)}
               />
             </div>
+          </div>
+
+          {/* Auto-Fill Button - Always visible now */}
+          <button
+            onClick={onAutoFill}
+            disabled={(!inputValue && !urlValue) || isAutoFilling}
+            className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-yellow-500 text-sm font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:text-zinc-600"
+          >
+            {isAutoFilling ? (
+                <Sparkles className="w-4 h-4 animate-spin" />
+            ) : (
+                <Wand2 className="w-4 h-4" />
+            )}
+            {isAutoFilling ? "Researching..." : "Auto-Fill Brief with AI"}
+          </button>
+
+          <div className="grid grid-cols-2 gap-4">
+             {/* Target Audience */}
+             <div className="col-span-2">
+                <label className="block text-sm text-zinc-400 mb-1">Target Audience</label>
+                <input 
+                    type="text"
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
+                    placeholder="e.g. Gen-Z Foodies"
+                    value={targetAudience}
+                    onChange={(e) => onTargetAudienceChange(e.target.value)}
+                />
+             </div>
+             
+             {/* Brand Tone */}
+             <div>
+                <label className="block text-sm text-zinc-400 mb-1">Tone of Voice</label>
+                <input 
+                    type="text"
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
+                    placeholder="e.g. Witty & Bold"
+                    value={customTone}
+                    onChange={(e) => onCustomToneChange(e.target.value)}
+                />
+             </div>
+
+             {/* Creative Direction */}
+             <div>
+                <label className="block text-sm text-zinc-400 mb-1">Creative Direction</label>
+                <input 
+                    type="text"
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
+                    placeholder="e.g. Neon Noir"
+                    value={creativeDirection}
+                    onChange={(e) => onCreativeDirectionChange(e.target.value)}
+                />
+             </div>
           </div>
 
           {/* Logo Upload */}
@@ -85,7 +157,7 @@ export const BrandDnaSection: React.FC<Props> = ({
              {!logoValue ? (
                <div 
                  onClick={() => logoInputRef.current?.click()}
-                 className="w-full h-16 border border-dashed border-zinc-700 rounded-lg flex items-center justify-center gap-2 cursor-pointer hover:bg-zinc-800 transition-colors"
+                 className="w-full h-14 border border-dashed border-zinc-700 rounded-lg flex items-center justify-center gap-2 cursor-pointer hover:bg-zinc-800 transition-colors"
                >
                  <Upload className="w-4 h-4 text-zinc-500" />
                  <span className="text-sm text-zinc-500">Upload Logo</span>

@@ -2,21 +2,35 @@ import React, { useState, useRef } from 'react';
 import { ApiKeySelector } from './components/ApiKeySelector';
 import { BrandDnaSection } from './components/BrandDnaSection';
 import { ImageCapture } from './components/ImageCapture';
-import { researchBrandDna, generateCreativeConcepts, generateHeroImage, generateFacebookPost } from './services/geminiService';
+import { researchBrandDna, generateCreativeConcepts, generateHeroImage, editHeroImage, generateFacebookPost, autoFillBrief } from './services/geminiService';
 import { AppState, BrandDna, ImageSize, CreativeConcept } from './types';
-import { Send, ImageIcon, Share2, Wand2, RefreshCcw, Copy, Sparkles, ArrowRight, ArrowLeft, CheckCircle, Download, Terminal } from 'lucide-react';
+import { Send, ImageIcon, Share2, Wand2, RefreshCcw, Copy, Sparkles, ArrowRight, ArrowLeft, CheckCircle, Download, Terminal, Edit2 } from 'lucide-react';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
     brandInput: '',
     brandUrl: '',
     brandLogo: null,
-    brandDna: null,
+    
+    // New Manual Inputs
+    targetAudience: '',
+    customTone: '',
+    creativeDirection: '',
+
+    // Food Source Inputs
+    productName: '',
     sourceImage: null,
+
+    brandDna: null,
     concepts: null,
     selectedConcept: null,
+    selectedCta: null,
+    
     isAnalyzing: false,
+    isAutoFilling: false,
     isGeneratingImage: false,
+    isEditingImage: false,
+    editInput: '',
     isGeneratingText: false,
     generatedImage: null,
     generatedText: null,
@@ -33,9 +47,65 @@ const App: React.FC = () => {
           brandDna: null,
           concepts: null,
           selectedConcept: null,
+          selectedCta: null,
           generatedImage: null,
           generatedText: null
       }));
+  };
+
+  /**
+   * Helper to convert an image URL to Base64.
+   * Note: This will likely fail for many URLs due to CORS unless a proxy is used.
+   * For the demo, we attempt it, and handle failure gracefully.
+   */
+  const convertUrlToBase64 = async (url: string): Promise<string | null> => {
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+        });
+    } catch (e) {
+        console.warn("Could not fetch logo due to CORS or network error:", e);
+        return null;
+    }
+  };
+
+  const handleAutoFill = async () => {
+    if (!state.brandInput && !state.brandUrl) {
+      setState(s => ({ ...s, error: "Enter a description or URL to auto-fill the brief." }));
+      return;
+    }
+    
+    setState(s => ({ ...s, isAutoFilling: true, error: null }));
+    
+    try {
+        const result = await autoFillBrief(state.brandInput, state.brandUrl);
+        
+        let logoBase64: string | null = state.brandLogo;
+
+        // If AI found a logo URL and we don't have one yet, try to fetch it
+        if (result.logoUrl && !state.brandLogo) {
+             const fetchedLogo = await convertUrlToBase64(result.logoUrl);
+             if (fetchedLogo) {
+                 logoBase64 = fetchedLogo;
+             }
+        }
+
+        setState(s => ({
+            ...s,
+            brandInput: result.brandDescription,
+            targetAudience: result.audience,
+            customTone: result.tone,
+            creativeDirection: result.direction,
+            brandLogo: logoBase64,
+            isAutoFilling: false
+        }));
+    } catch (e: any) {
+        setState(s => ({ ...s, error: `Auto-fill failed: ${e.message}`, isAutoFilling: false }));
+    }
   };
 
   const handleAnalysisAndIdeation = async () => {
@@ -52,11 +122,20 @@ const App: React.FC = () => {
 
     try {
       // 1. Analyze Brand DNA (uses 2.5 Flash - Free/Fast)
-      // Now including sourceImage in the analysis to pick up visual cues from the product itself
-      const dna = await researchBrandDna(state.brandInput, state.brandUrl, state.brandLogo, state.sourceImage);
+      // Now passing the new manual inputs to guide the analysis
+      const dna = await researchBrandDna(
+          state.brandInput, 
+          state.brandUrl, 
+          state.brandLogo, 
+          state.sourceImage,
+          state.productName,
+          state.targetAudience,
+          state.customTone,
+          state.creativeDirection
+      );
       
       // 2. Generate Concepts based on DNA + Image (uses 2.5 Flash - Free/Fast)
-      const concepts = await generateCreativeConcepts(dna, state.sourceImage);
+      const concepts = await generateCreativeConcepts(dna, state.sourceImage, state.productName);
 
       setState(s => ({ 
           ...s, 
@@ -69,12 +148,13 @@ const App: React.FC = () => {
     }
   };
 
-  const handleFinalGeneration = async (concept: CreativeConcept) => {
+  const handleFinalGeneration = async (concept: CreativeConcept, chosenCta: string) => {
     if (!state.brandDna) return;
     
     setState(s => ({ 
         ...s, 
         selectedConcept: concept,
+        selectedCta: chosenCta,
         isGeneratingImage: true, 
         isGeneratingText: true, 
         error: null,
@@ -85,11 +165,11 @@ const App: React.FC = () => {
 
     // Trigger parallel generation
     try {
-        generateHeroImage(state.brandDna, state.sourceImage, concept, state.selectedSize)
+        generateHeroImage(state.brandDna, state.sourceImage, concept, state.selectedSize, state.productName, chosenCta)
             .then(imgUrl => setState(s => ({ ...s, generatedImage: imgUrl, isGeneratingImage: false })))
             .catch(e => setState(s => ({ ...s, error: `Image Gen Error: ${e.message}`, isGeneratingImage: false })));
 
-        generateFacebookPost(state.brandDna, concept)
+        generateFacebookPost(state.brandDna, concept, state.productName)
             .then(text => setState(s => ({ ...s, generatedText: text, isGeneratingText: false })))
             .catch(e => setState(s => ({ ...s, error: `Text Gen Error: ${e.message}`, isGeneratingText: false })));
             
@@ -98,92 +178,47 @@ const App: React.FC = () => {
     }
   };
 
-  /**
-   * Composites the Image, Logo, and CTA into a single Canvas for download.
-   */
-  const handleDownloadComposite = () => {
-    if (!state.generatedImage || !state.selectedConcept) return;
-
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = state.generatedImage;
+  const handleEditImage = async () => {
+    if (!state.generatedImage || !state.editInput) return;
     
-    img.onload = () => {
-      // Set canvas to 16:9 HD resolution
-      canvas.width = 1920;
-      canvas.height = 1080;
-
-      // 1. Draw Hero Image
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      // 2. Draw CTA Badge (Bottom Right)
-      const ctaText = state.selectedConcept!.overlayCta;
-      const fontSize = 60;
-      ctx.font = `bold ${fontSize}px sans-serif`;
-      const textMetrics = ctx.measureText(ctaText);
-      const padding = 40;
-      const boxWidth = textMetrics.width + padding * 2;
-      const boxHeight = fontSize + padding * 2;
-      const boxX = canvas.width - boxWidth - 60;
-      const boxY = canvas.height - boxHeight - 60;
-
-      // CTA Background (Yellow)
-      ctx.fillStyle = '#EAB308'; // Tailwind yellow-500
-      ctx.beginPath();
-      ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 20);
-      ctx.fill();
-
-      // CTA Text (Black)
-      ctx.fillStyle = '#000000';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(ctaText, boxX + padding, boxY + boxHeight/2);
-
-      // 3. Draw Logo (Top Left) - if exists
-      if (state.brandDna?.logoImage) {
-        const logo = new Image();
-        logo.src = state.brandDna.logoImage;
-        logo.onload = () => {
-          // Resize logo to ~150px height while maintaining aspect
-          const scale = 150 / logo.height;
-          const lw = logo.width * scale;
-          const lh = logo.height * scale;
-          ctx.drawImage(logo, 60, 60, lw, lh);
-          triggerDownload(canvas);
-        };
-        logo.onerror = () => triggerDownload(canvas); // Download anyway if logo fails
-      } else {
-        triggerDownload(canvas);
-      }
-    };
+    setState(s => ({ ...s, isEditingImage: true, error: null }));
+    
+    try {
+        const newImage = await editHeroImage(state.generatedImage, state.editInput);
+        setState(s => ({
+            ...s,
+            generatedImage: newImage,
+            isEditingImage: false,
+            editInput: '' // Clear input on success
+        }));
+    } catch (e: any) {
+        setState(s => ({ ...s, error: `Edit failed: ${e.message}`, isEditingImage: false }));
+    }
   };
 
-  const triggerDownload = (canvas: HTMLCanvasElement) => {
+  /**
+   * Direct download of the generated image since text/logo are now baked in by AI.
+   */
+  const handleDownloadComposite = () => {
+    if (!state.generatedImage) return;
+
     const link = document.createElement('a');
-    link.download = `hero-${state.brandDna?.name || 'brand'}.png`;
-    link.href = canvas.toDataURL('image/png');
+    link.download = `poster-${state.brandDna?.name || 'brand'}.png`;
+    link.href = state.generatedImage;
     link.click();
   };
 
   // Construct the prompt used for generation for display
   const getPromptText = () => {
-    if (!state.selectedConcept || !state.brandDna) return '';
-    return `Generate a high-end Facebook Hero Image.
+    if (!state.selectedConcept || !state.brandDna || !state.selectedCta) return '';
+    return `Design a professional, high-quality advertising poster.
   
-Concept: ${state.selectedConcept.title}
-Visual Direction: ${state.selectedConcept.visualPrompt}
+Subject: ${state.productName || 'Food Item'}
+Style/Concept: ${state.selectedConcept.title}
+Art Direction: ${state.selectedConcept.visualPrompt}
 
-Brand Identity:
-- Name: ${state.brandDna.name}
-- Style: ${state.brandDna.visualStyle}
-
-Requirements:
-- Aspect Ratio: 16:9
-- Photorealistic, appetizing food photography.
-- Lighting: Professional studio lighting matching the brand tone (${state.brandDna.tone}).`;
+CRITICAL: Render headline "${state.selectedCta}" directly in image.
+Incorporating provided logo.`;
   };
 
   return (
@@ -239,11 +274,23 @@ Requirements:
                         onUrlChange={(val) => setState(s => ({ ...s, brandUrl: val }))}
                         logoValue={state.brandLogo}
                         onLogoChange={(val) => setState(s => ({ ...s, brandLogo: val }))}
+                        
+                        targetAudience={state.targetAudience}
+                        onTargetAudienceChange={(val) => setState(s => ({ ...s, targetAudience: val }))}
+                        customTone={state.customTone}
+                        onCustomToneChange={(val) => setState(s => ({ ...s, customTone: val }))}
+                        creativeDirection={state.creativeDirection}
+                        onCreativeDirectionChange={(val) => setState(s => ({ ...s, creativeDirection: val }))}
+                        
+                        onAutoFill={handleAutoFill}
+                        isAutoFilling={state.isAutoFilling}
                         brandDna={state.brandDna}
                     />
                     <ImageCapture 
                         image={state.sourceImage}
                         onImageCapture={(base64) => setState(s => ({ ...s, sourceImage: base64 }))}
+                        productName={state.productName}
+                        onProductNameChange={(val) => setState(s => ({ ...s, productName: val }))}
                     />
                 </div>
 
@@ -274,26 +321,28 @@ Requirements:
               <div className="animate-in fade-in slide-in-from-bottom-8 duration-500 space-y-6">
                   <div className="text-center space-y-2">
                       <h2 className="text-3xl font-bold text-white">Choose a Direction</h2>
-                      <p className="text-zinc-400">Our AI researched your brand and found 3 creative angles for this photo.</p>
+                      <p className="text-zinc-400">Select a headline style to generate your poster.</p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {state.concepts.map((concept) => (
                           <div 
                             key={concept.id}
-                            onClick={() => handleFinalGeneration(concept)}
-                            className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-yellow-500/50 p-6 rounded-2xl cursor-pointer transition-all group relative overflow-hidden flex flex-col"
+                            className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl flex flex-col group hover:border-zinc-700 transition-colors"
                           >
-                              <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <ArrowRight className="text-yellow-500 w-6 h-6" />
-                              </div>
-                              <h3 className="text-xl font-bold text-white mb-2 group-hover:text-yellow-500 transition-colors">{concept.title}</h3>
-                              <p className="text-zinc-400 text-sm mb-4 flex-1">{concept.rationale}</p>
-                              <div className="space-y-2">
-                                <div className="text-xs text-zinc-500 font-mono">CTA Idea:</div>
-                                <div className="text-sm font-bold text-yellow-500 bg-yellow-500/10 p-2 rounded border border-yellow-500/20 text-center">
-                                    "{concept.overlayCta}"
-                                </div>
+                              <h3 className="text-xl font-bold text-white mb-2 text-yellow-500">{concept.title}</h3>
+                              <p className="text-zinc-400 text-sm mb-4 flex-1 border-b border-zinc-800 pb-4">{concept.rationale}</p>
+                              <div className="space-y-3">
+                                <div className="text-xs text-zinc-500 font-mono uppercase tracking-wider">Select a Headline:</div>
+                                {concept.overlayCtas.map((cta, idx) => (
+                                    <button 
+                                        key={idx}
+                                        onClick={() => handleFinalGeneration(concept, cta)}
+                                        className="w-full text-left text-sm font-bold text-zinc-300 bg-zinc-800 hover:bg-yellow-500 hover:text-black p-3 rounded-lg border border-zinc-700 hover:border-yellow-500 transition-all active:scale-95"
+                                    >
+                                        "{cta}"
+                                    </button>
+                                ))}
                               </div>
                           </div>
                       ))}
@@ -317,9 +366,9 @@ Requirements:
                             {state.selectedConcept.title}
                             <span className="text-xs bg-yellow-500 text-black px-2 py-1 rounded font-bold uppercase">Selected</span>
                         </h2>
-                        <p className="text-zinc-500 text-sm">Generating final assets based on this concept...</p>
+                        <p className="text-zinc-500 text-sm">Using headline: <span className="text-zinc-300">"{state.selectedCta}"</span></p>
                     </div>
-                    <button onClick={() => setState(s => ({ ...s, selectedConcept: null, generatedImage: null, generatedText: null }))} className="text-zinc-400 hover:text-white text-sm">
+                    <button onClick={() => setState(s => ({ ...s, selectedConcept: null, selectedCta: null, generatedImage: null, generatedText: null }))} className="text-zinc-400 hover:text-white text-sm">
                         Change Concept
                     </button>
                 </div>
@@ -334,37 +383,25 @@ Requirements:
                         </div>
                         
                         <div ref={resultImageContainerRef} className="relative aspect-video bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 group shadow-lg">
-                            {state.isGeneratingImage ? (
-                                <div className="absolute inset-0 flex items-center justify-center flex-col gap-3">
+                            {state.isGeneratingImage || state.isEditingImage ? (
+                                <div className="absolute inset-0 flex items-center justify-center flex-col gap-3 z-10 bg-zinc-900/80 backdrop-blur-sm">
                                     <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
-                                    <p className="text-zinc-500 text-sm animate-pulse">Rendering high-res asset...</p>
+                                    <p className="text-zinc-500 text-sm animate-pulse">
+                                        {state.isEditingImage ? "Applying edits..." : "Designing Poster & Typography..."}
+                                    </p>
                                 </div>
                             ) : state.generatedImage ? (
                                 <>
-                                    {/* Generated Base Image */}
+                                    {/* Generated Base Image (Now contains text/logo) */}
                                     <img src={state.generatedImage} alt="Generated Hero" className="w-full h-full object-cover" />
                                     
-                                    {/* Logo Overlay (Top Left) */}
-                                    {state.brandDna?.logoImage && (
-                                        <div className="absolute top-4 left-4 max-w-[20%]">
-                                            <img src={state.brandDna.logoImage} alt="Brand Logo" className="w-full h-auto drop-shadow-lg" />
-                                        </div>
-                                    )}
-
-                                    {/* CTA Overlay (Bottom Right) */}
-                                    <div className="absolute bottom-6 right-6">
-                                        <div className="bg-yellow-500 text-black font-bold px-6 py-3 rounded-xl shadow-xl transform rotate-[-2deg] border-2 border-white/20 backdrop-blur-sm text-lg md:text-xl">
-                                            {state.selectedConcept.overlayCta}
-                                        </div>
-                                    </div>
-
                                     {/* Download Button overlay */}
                                     <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                         <button 
                                             onClick={handleDownloadComposite}
                                             className="bg-black/80 hover:bg-black text-white px-4 py-2 rounded-full text-sm font-bold backdrop-blur-md flex items-center gap-2 border border-white/10"
                                         >
-                                            <Download className="w-4 h-4" /> Save Composite
+                                            <Download className="w-4 h-4" /> Download Poster
                                         </button>
                                     </div>
                                 </>
@@ -372,6 +409,32 @@ Requirements:
                                 <div className="absolute inset-0 flex items-center justify-center text-zinc-700">Generation failed</div>
                             )}
                         </div>
+
+                        {/* Edit Image Input Group */}
+                        {state.generatedImage && !state.isGeneratingImage && !state.isEditingImage && (
+                            <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                    <Edit2 className="absolute left-3 top-3 w-4 h-4 text-zinc-500" />
+                                    <input 
+                                        type="text"
+                                        className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 pl-9 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
+                                        placeholder="E.g. Add more smoke, change background to blue..."
+                                        value={state.editInput}
+                                        onChange={(e) => setState(s => ({ ...s, editInput: e.target.value }))}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleEditImage();
+                                        }}
+                                    />
+                                </div>
+                                <button 
+                                    onClick={handleEditImage}
+                                    disabled={!state.editInput}
+                                    className="bg-zinc-800 hover:bg-zinc-700 text-yellow-500 font-bold px-4 rounded-lg text-sm border border-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    Edit
+                                </button>
+                            </div>
+                        )}
 
                          {/* Prompt Display Section */}
                          {state.generatedImage && (

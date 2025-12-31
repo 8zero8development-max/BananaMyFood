@@ -31,22 +31,34 @@ export interface CreativeConcept {
   rationale: string;
   visualPrompt: string;
   copyAngle: string;
-  overlayCta: string; // New: Short text to overlay on image
+  overlayCtas: string[]; // Changed to array of strings
 }
 
 export interface AppState {
   brandInput: string;
   brandUrl: string;
   brandLogo: string | null;
-  brandDna: BrandDna | null;
   
+  // New Manual Inputs
+  targetAudience: string;
+  customTone: string;
+  creativeDirection: string;
+
+  // Food Source Inputs
+  productName: string; // New
   sourceImage: string | null; // Base64
+  
+  brandDna: BrandDna | null;
   
   concepts: CreativeConcept[] | null;
   selectedConcept: CreativeConcept | null;
+  selectedCta: string | null; // New: Track which specific CTA was chosen
 
   isAnalyzing: boolean;
+  isAutoFilling: boolean; // New loading state
   isGeneratingImage: boolean;
+  isEditingImage: boolean; // New: track edit loading state
+  editInput: string; // New: track edit text input
   isGeneratingText: boolean;
   
   generatedImage: string | null;
