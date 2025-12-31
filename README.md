@@ -6,12 +6,13 @@ It leverages Google's **Gemini 2.5 Flash** models to provide a completely free-t
 
 ## ✨ Features
 
-- **🧬 Deep Brand DNA Research**: Analyzes your brand description, website URL, logo, and source food images to extract visual style, tone of voice, and key themes.
+- **🔎 Smart Brand Research (Grounding)**: Uses **Google Search** grounding to automatically research your brand from a URL, inferring audience, tone, and even finding your logo on the web.
+- **🧬 Deep Brand DNA**: Analyzes your inputs to extract visual style, tone of voice, and key themes. Now supports granular manual overrides for Target Audience, Tone, and Creative Direction.
 - **📸 Image Capture & Analysis**: Upload existing photos or capture fresh food shots directly from your device.
-- **🧠 Creative Direction**: automatically generates 3 distinct creative concepts (marketing angles) based on your brand identity and specific food item.
-- **🎨 AI Image Generation**: Creates photorealistic 16:9 Hero images using `gemini-2.5-flash-image`, tailored to the selected creative concept.
+- **🧠 Granular Creative Direction**: Generates 3 distinct creative concepts. For each concept, it provides **3 selectable Headlines/CTAs**, allowing you to choose the exact angle for your ad.
+- **🎨 AI Typography & Logo Integration**: Unlike basic overlays, this app uses `gemini-2.5-flash-image` to **render text and logos directly into the pixels** of the image for professional, magazine-quality typography and composition.
+- **🪄 Conversational Image Editing**: Not happy with the result? Type instructions like "add more steam" or "change background to neon" to refine the image instantly.
 - **✍️ Copywriting**: Writes engaging Facebook post content, including headlines, body copy, and hashtags that match your brand's voice.
-- **🖼️ Auto-Compositing**: Automatically overlays your brand logo and a stylized Call-to-Action (CTA) button onto the generated image for a ready-to-download marketing asset.
 - **💸 Free Tier Optimized**: Built entirely using Gemini 1.5/2.5 Flash models to ensure low latency and zero cost on the free tier.
 
 ## 🚀 Getting Started
@@ -55,17 +56,20 @@ The application requires a Google Gemini API Key. You have two options:
 ## 📖 How to Use
 
 1.  **Define Brand DNA**:
-    *   Enter a short description of your restaurant or food brand (e.g., "A gritty late-night burger joint").
-    *   (Optional) Enter your website URL and upload a transparent PNG logo.
+    *   Enter your website URL and click **"Auto-Fill Brief with AI"**. The app will search Google to fill in your brand description, audience, tone, and attempt to fetch your logo.
+    *   (Optional) Fine-tune the "Target Audience", "Tone", and "Creative Direction" fields manually.
 2.  **Add Food Source**:
     *   Upload a photo of your dish or take a picture using your device's camera.
+    *   Give your product a name (e.g., "The Truffle Smash").
 3.  **Generate Concepts**:
-    *   Click **"Generate Creative Concepts"**. The AI will analyze your Brand DNA and the specific food photo to propose 3 unique marketing angles.
-4.  **Select & Polish**:
-    *   Choose the concept you like best.
-    *   The app will generate a high-definition Hero Image and matching Facebook post text.
-5.  **Download**:
-    *   Click **"Save Composite"** to download the final image with your logo and a CTA button baked in, ready for social media.
+    *   Click **"Generate Creative Concepts"**. The AI will propose 3 unique art directions.
+4.  **Select Direction**:
+    *   Review the concepts. Each concept offers **3 distinct Headlines**.
+    *   Click the specific Headline (CTA) you want to use.
+5.  **Refine & Download**:
+    *   The app generates a high-definition Hero Image with the chosen headline baked into the design.
+    *   Use the **Edit** box to tweak the image (e.g., "Make the lighting moodier").
+    *   Click **"Download Poster"** to save your asset.
 
 ## 🛠️ Tech Stack
 
@@ -73,6 +77,7 @@ The application requires a Google Gemini API Key. You have two options:
 - **Styling**: Tailwind CSS
 - **Icons**: Lucide React
 - **AI**: @google/genai SDK (Gemini 2.5 Flash & Flash Image)
+- **Tools**: Google Search Grounding
 - **Build**: Vite (recommended) or Parcel
 
 ## 📄 License
