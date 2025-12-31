@@ -1,0 +1,7 @@
+{
+  "name": "Banana my food socials",
+  "description": "An AI-powered brand content generator that transforms food photos into captivating Facebook hero images and posts using Brand DNA analysis.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
