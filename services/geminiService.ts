@@ -6,6 +6,63 @@ const getAiClient = () => {
 };
 
 /**
+ * Helper to convert SVG base64 to PNG base64 to ensure API compatibility.
+ */
+const convertSvgToPng = (base64Svg: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      // Use natural dimensions, fallback to reasonable size if missing
+      canvas.width = img.width || 800;
+      canvas.height = img.height || 800;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Canvas context not available'));
+        return;
+      }
+      // Draw white background for transparent SVGs if needed, but keeping transparent is usually better for logos.
+      // However, converting to PNG preserves transparency.
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = (e) => reject(e);
+    img.src = base64Svg;
+  });
+};
+
+/**
+ * Prepares image for API. Handles SVG conversion and base64 extraction.
+ */
+const resolveImage = async (base64String: string): Promise<{ mimeType: string, data: string }> => {
+    let finalString = base64String;
+    
+    // Check for SVG mime type in header
+    if (finalString.includes('image/svg+xml')) {
+        try {
+            finalString = await convertSvgToPng(finalString);
+        } catch (e) {
+            console.error("Failed to convert SVG to PNG", e);
+            throw new Error("Unable to process SVG image. Please try a PNG or JPG.");
+        }
+    }
+
+    const match = finalString.match(/^data:(.*?);base64,(.*)$/);
+    if (match) {
+        return {
+            mimeType: match[1],
+            data: match[2]
+        };
+    }
+    
+    // Fallback for raw base64, assume jpeg
+    return {
+        mimeType: 'image/jpeg',
+        data: finalString
+    };
+};
+
+/**
  * Quickly infers audience, tone, and direction from basic description/URL.
  * Used to auto-fill the brief inputs.
  */
@@ -24,31 +81,39 @@ export const autoFillBrief = async (
   1. Write a short, engaging "Brand Description" (if one wasn't provided, create it based on the URL name; if provided, refine it).
   2. Return short, punchy summaries for Audience, Tone, and Direction.
   3. Search for a direct URL to the brand's logo (preferably PNG or JPG on a transparent background).
+
+  IMPORTANT: Return the result strictly as a raw JSON object. Do not include markdown formatting (like \`\`\`json).
+  
+  Expected JSON Structure:
+  {
+    "brandDescription": "string",
+    "audience": "string",
+    "tone": "string",
+    "direction": "string",
+    "logoUrl": "string (valid http url or null)"
+  }
   `;
 
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: { parts: [{ text: prompt }] },
     config: {
-      tools: [{ googleSearch: {} }],
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          brandDescription: { type: Type.STRING, description: "A concise 1-2 sentence description of what the brand is." },
-          audience: { type: Type.STRING, description: "e.g., Gen-Z foodies, Corporate lunch crowds" },
-          tone: { type: Type.STRING, description: "e.g., Witty, Premium, Rustic, High-Energy" },
-          direction: { type: Type.STRING, description: "e.g., Neon-noir street food vibe, Clean minimalist daylight" },
-          logoUrl: { type: Type.STRING, description: "A direct http URL to the brand's logo image file." }
-        },
-        required: ["brandDescription", "audience", "tone", "direction"]
-      }
+      tools: [{ googleSearch: {} }]
     }
   });
 
-  const text = response.text;
+  let text = response.text;
   if (!text) throw new Error("No response from Gemini");
-  return JSON.parse(text);
+
+  // Clean up potential markdown formatting from the model
+  text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Failed to parse JSON from autoFillBrief:", text);
+    throw new Error("AI returned invalid JSON format. Please try again.");
+  }
 };
 
 /**
@@ -88,22 +153,16 @@ export const researchBrandDna = async (
   const parts: any[] = [{ text: prompt }];
   
   if (logoBase64) {
-    const base64Data = logoBase64.split(',')[1] || logoBase64;
+    const { mimeType, data } = await resolveImage(logoBase64);
     parts.push({
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: base64Data
-      }
+      inlineData: { mimeType, data }
     });
   }
 
   if (sourceImageBase64) {
-    const base64Data = sourceImageBase64.split(',')[1] || sourceImageBase64;
+    const { mimeType, data } = await resolveImage(sourceImageBase64);
     parts.push({
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: base64Data
-      }
+      inlineData: { mimeType, data }
     });
   }
 
@@ -133,7 +192,7 @@ export const researchBrandDna = async (
   return {
     ...result,
     websiteUrl,
-    logoImage: logoBase64
+    logoImage: logoBase64 // Keep original for display, but prompt analysis used the converted version
   };
 };
 
@@ -147,7 +206,7 @@ export const generateCreativeConcepts = async (
   productName: string
 ): Promise<CreativeConcept[]> => {
   const ai = getAiClient();
-  const base64Data = sourceImageBase64.split(',')[1] || sourceImageBase64;
+  const { mimeType, data } = await resolveImage(sourceImageBase64);
 
   const prompt = `You are a world-class Art Director & Graphic Designer. 
   
@@ -178,7 +237,7 @@ export const generateCreativeConcepts = async (
     contents: {
       parts: [
         { text: prompt },
-        { inlineData: { mimeType: 'image/jpeg', data: base64Data } }
+        { inlineData: { mimeType, data } }
       ]
     },
     config: {
@@ -242,18 +301,18 @@ export const generateHeroImage = async (
 
   // 1. Pass source food image
   if (sourceImageBase64) {
-    const base64Data = sourceImageBase64.split(',')[1] || sourceImageBase64;
+    const { mimeType, data } = await resolveImage(sourceImageBase64);
     parts.push({
-      inlineData: { mimeType: 'image/jpeg', data: base64Data }
+      inlineData: { mimeType, data }
     });
     parts.push({ text: `REFERENCE IMAGE 1 (Product): Use this as the main subject.` });
   }
 
   // 2. Pass logo as reference for COMPOSITION
   if (brandDna.logoImage) {
-    const logoData = brandDna.logoImage.split(',')[1] || brandDna.logoImage;
+    const { mimeType, data } = await resolveImage(brandDna.logoImage);
     parts.push({
-      inlineData: { mimeType: 'image/png', data: logoData }
+      inlineData: { mimeType, data }
     });
     parts.push({ text: "REFERENCE IMAGE 2 (Logo): Place this logo in the design or redraw it to match the style." });
   }
@@ -286,8 +345,7 @@ export const editHeroImage = async (
   editInstruction: string
 ): Promise<string> => {
   const ai = getAiClient();
-  // Strip potential prefix to get raw base64
-  const base64Data = currentImageBase64.split(',')[1] || currentImageBase64;
+  const { mimeType, data } = await resolveImage(currentImageBase64);
 
   const prompt = `Edit this image. Instruction: ${editInstruction}. Maintain the high-quality professional advertising aesthetic, the layout, and the aspect ratio.`;
 
@@ -296,10 +354,7 @@ export const editHeroImage = async (
     contents: {
       parts: [
         {
-          inlineData: {
-            mimeType: 'image/png', // Generated images are typically png
-            data: base64Data
-          }
+          inlineData: { mimeType, data }
         },
         { text: prompt }
       ]
